@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import f1_score, r2_score, classification_report, confusion_matrix,ConfusionMatrixDisplay
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
 from scipy.sparse import hstack
 
@@ -176,7 +176,7 @@ getX = df_conv[df_conv["Embarked"].notna()][features_for_embarked]
 getY = df_conv[df_conv["Embarked"].notna()]["Embarked"]
     
 #split the dataset
-X_train, X_test, y_train, y_test = train_test_split(getX, getY, test_size=0.2, random_state=42, stratify=getY)
+X_train_e, X_test_e, y_train_e, y_test_e = train_test_split(getX, getY, test_size=0.2, random_state=42, stratify=getY)
 
 
 #náhodný les
@@ -201,24 +201,24 @@ grid_search = GridSearchCV(
 )
 
 # Fit the model to the training data
-grid_search.fit(X_train, y_train)
+grid_search.fit(X_train_e, y_train_e)
 
 best_embarked_model = grid_search.best_estimator_
 
-y_pred = best_embarked_model.predict(X_test)
+y_pred_e = best_embarked_model.predict(X_test_e)
 
-cm_embarked = confusion_matrix(y_test, y_pred, labels=best_embarked_model.classes_)
+cm_embarked = confusion_matrix(y_test_e, y_pred_e, labels=best_embarked_model.classes_)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm_embarked, display_labels=best_embarked_model.classes_)
 disp.plot(cmap=plt.cm.Blues)
 plt.title("Confusion Matrix")
 plt.show()
 
-print(classification_report(y_test, y_pred))
-print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test_e, y_pred_e))
+print(confusion_matrix(y_test_e, y_pred_e))
 
-y_train_pred = best_embarked_model.predict(X_train)
-print(confusion_matrix(y_train, y_train_pred))
-print(classification_report(y_train, y_train_pred))
+y_train_pred_e = best_embarked_model.predict(X_train_e)
+print(confusion_matrix(y_train_e, y_train_pred_e))
+print(classification_report(y_train_e, y_train_pred_e))
 #nějak se musím rozhodnot kdy použiju ten  model a kdy bych vynechal data nebo nějak doplnil ručně
 #konkrétně tady mi ten model nevychází nijak extra dobře, ale nechci už nad tím trávit tolik času. 
 #kdybych to doplňoval od oka, tak bych tam dal stejné hodnoty jako to vyšlo...
@@ -328,18 +328,61 @@ print(confusion_matrix(y_test, y_pred_age))
 #--------------------------------------- Finální příprava pro trénování-------------------
 #Rozdělení dat na trénovací, testovací a to se co má určit
 #asi se použije randomforest, nemám data připravená pro KNN 
+#["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch", "SibSp"]
+
+features_to_be_used = ["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch", "SibSp"]
+
 df.shape
-X = df[df["Survived"].notna()]
-X = X.drop(columns= ["Survived"])
+X = df[df["Survived"].notna()][features_to_be_used]
+
+
+#přidat kod pro tvorbu alternativního setu, kdterý bude škálovaný pomocí minmaxscaler, kdyby se chtěl vyzkoušet KNN model
+
+scaler = MinMaxScaler()
+
+X_scaled = pd.DataFrame(scaler.fit_transform(X))
+
+columns_scaled = dict(enumerate(list(scaler.get_feature_names_out())))
+X_scaled.rename(columns=columns_scaled, inplace=True)
+
+
 X.shape
 y = df[df["Survived"].notna()]["Survived"]
 y.shape
 X_guess = df[df["Survived"].isna()]
 X_guess.shape
 
-plt.figure(figsize=(6, 4))
-sns.kdeplot(x=df["Fare_c"], hue=df["Survived"])
-plt.title('Fare vs Survived')
-plt.show()
 
-#X_train, X_test, y_train, y_test = train_test_split(X_age, y_age, test_size=0.2, random_state=42, stratify=y_age)
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+rfc_surv = RandomForestClassifier(random_state=42)
+
+#optimalizace hyperparametrů
+param_grid_surv = {
+    'n_estimators': [100, 300, 500],
+    'max_depth': [5, 7, 10],
+    'min_samples_split': [3, 5, 7],
+    'min_samples_leaf': [2, 4, 6],
+    'max_features': ['sqrt', 3, 5]
+}
+
+# Grid search
+grid_search_surv = GridSearchCV(
+    estimator=rfc_surv,
+    param_grid=param_grid_surv,
+    cv=5,
+    scoring='accuracy',
+    verbose=2,
+    n_jobs=-1  # Use all available cores
+)
+
+grid_search_surv.fit(X_train, y_train)
+
+best_surv_model = grid_search_surv.best_estimator_
+grid_search_surv.best_params_
+y_pred_surv = best_surv_model.predict(X_test)
+
+print(classification_report(y_test, y_pred_surv))
+print(confusion_matrix(y_test, y_pred_surv))
