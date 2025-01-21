@@ -261,21 +261,29 @@ plt.title('Fare vs Age')
 plt.show()
 
 
-df_emb_conv=df_emb
-df_emb_conv.loc[:, 'Embarked']=df_emb["Embarked"].apply(lambda x: map_embarked[x])
+df_emb.loc[:,"Embarked"] = df_emb["Embarked"].apply(lambda x: map_embarked[x])
+df_emb['Embarked'] = pd.to_numeric(df_emb['Embarked'], downcast='integer', errors='coerce')
+df_emb.info()
+
+grouped = df_emb[["Pclass","CondTitle", "Age"]].groupby(["Pclass", "CondTitle"]).median()
+group_reset = grouped.reset_index()
+group_reset.rename(columns={"Age": "NewAge"}, inplace=True)
+df_emb = df_emb.merge(group_reset, on=["Pclass", "CondTitle"], how='left')
+df_emb["Age_c"] = df_emb.apply(lambda x: x["NewAge"] if pd.isna(x["Age"]) else x["Age"], axis=1)
+
+#finální dataframe , numerické hodnoty ve všech polích, doplněné chybějící hodnoty
+df = df_emb.drop(columns=["Age", "NewAge"])
+
+"""
 
 plt.figure()
-pd.qcut(df_emb_conv['Age'], q=8).value_counts().plot(kind='bar', title='Equal Frequency')
+pd.qcut(df_emb_conv['Age'], q=5).value_counts().plot(kind='bar', title='Equal Frequency')
 plt.show()
 
-binned_age = pd.qcut(df_emb_conv['Age'], q=8, labels=False)
-
-df_emb_conv["Age_b"]=binned_age
-
-#corr = df_emb_conv.corr().abs().round(3)
-#sns.heatmap(corr, cmap=None, annot=True)
-#fare a sex podle mě nemají vliv na age
-X_age = df_emb_conv[df_emb_conv["Age"].notna()][["CondTitle", "Pclass", "SibSp", "Parch", "Embarked"]]
+binned_age = pd.qcut(df_emb_conv['Age'], q=5, labels=False)
+tohle nějak moc nefunguje
+vyzkouším age nahradit nějakým průměrem a porovnat model s age a bez age sloupce
+X_age = df_emb_conv[df_emb_conv["Age"].notna()][["CondTitle", "Pclass", "Embarked"]]
 y_age = df_emb_conv[df_emb_conv["Age"].notna()]["Age_b"]
 
 
@@ -291,7 +299,8 @@ param_grid = {
     'n_estimators': [100, 300, 500],
     'max_depth': [3, 5, 10],
     'min_samples_split': [3, 5, 7],
-    'min_samples_leaf': [2, 4, 6]
+    'min_samples_leaf': [2, 4, 6],
+    'max_features': ['sqrt', 3]
 }
 
 # Grid search
@@ -314,8 +323,23 @@ y_pred_age = best_age_model.predict(X_test)
 
 print(classification_report(y_test, y_pred_age))
 print(confusion_matrix(y_test, y_pred_age))
+"""
 
+#--------------------------------------- Finální příprava pro trénování-------------------
+#Rozdělení dat na trénovací, testovací a to se co má určit
+#asi se použije randomforest, nemám data připravená pro KNN 
+df.shape
+X = df[df["Survived"].notna()]
+X = X.drop(columns= ["Survived"])
+X.shape
+y = df[df["Survived"].notna()]["Survived"]
+y.shape
+X_guess = df[df["Survived"].isna()]
+X_guess.shape
 
+plt.figure(figsize=(6, 4))
+sns.kdeplot(x=df["Fare_c"], hue=df["Survived"])
+plt.title('Fare vs Survived')
+plt.show()
 
-
-
+#X_train, X_test, y_train, y_test = train_test_split(X_age, y_age, test_size=0.2, random_state=42, stratify=y_age)
