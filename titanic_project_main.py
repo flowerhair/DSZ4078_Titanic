@@ -347,7 +347,18 @@ for f in features_to_be_used:
    i = i + 1
 
 
+final_model = results[3]['eval']['estimator']
+final_estimator = RandomForestClassifier(
+    max_depth=7,
+    max_features=3,
+    min_samples_leaf=2,
+    min_samples_split=3,
+    n_estimators=100
+    )
 
+X_final = df[df["Survived"].notna()][features_to_be_used[3]]
+y_final = y
 
-
-
+final_estimator.fit(X_final, y_final)
+X_guess = df[df["Survived"].isna()][features_to_be_used[3]].reset_index(drop=True)
+y_guess = final_estimator.predict(X_guess)
