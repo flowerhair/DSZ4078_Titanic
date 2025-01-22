@@ -18,7 +18,7 @@ from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.ensemble import RandomForestClassifier
 from scipy.sparse import hstack
 
-from titanic_lib import predict_cat_feature, predict_cont_feature 
+from titanic_lib import test_rfc
 
 df_train = pd.read_csv('./files/titanic_train.csv')
 df_test = pd.read_csv('./files/titanic_test.csv')
@@ -126,25 +126,10 @@ for feature in con_cols:
     plt.title(f'{feature} vs Target')
     plt.show()    
 
-plt.figure(figsize=(6, 4))
-sns.countplot(x=df_combined["CondTitle"], hue=df_combined["Pclass"])
-plt.title('Title vs Class')
-plt.show()
 
-plt.figure(figsize=(6, 4))
-sns.kdeplot(x=df_combined["Age"], hue=df_combined["Embarked"])
-plt.title('Age vs Embarked')
-plt.show()
 
-plt.figure(figsize=(6, 4))
-sns.kdeplot(x=df_combined["Fare"], hue=df_combined["Title"])
-plt.title('Fare vs Class')
-plt.show()
 
-plt.figure(figsize=(6, 4))
-sns.scatterplot(x=df_combined["Fare"], y=df_combined["Age"], hue=df_combined["Pclass"])
-plt.title('Fare vs Age')
-plt.show()
+
 
 #chci vidět jestli max fare záznam dává smysl - dává , podle všeho není outlier
 #df_combined[df_combined["Fare"]==df_combined["Fare"].max()]
@@ -330,10 +315,14 @@ print(confusion_matrix(y_test, y_pred_age))
 #asi se použije randomforest, nemám data připravená pro KNN 
 #["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch", "SibSp"]
 
-features_to_be_used = ["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch", "SibSp"]
+features_to_be_used = [["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch", "SibSp"],
+    ["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "SibSp"],
+    ["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked", "Parch"],
+    ["Sex_c", "Pclass", "Age_c", "CondTitle", "Embarked"],
+    ["Sex_c", "Pclass", "CondTitle", "Embarked"]]
 
-df.shape
-X = df[df["Survived"].notna()][features_to_be_used]
+
+X = df[df["Survived"].notna()][features_to_be_used[0]]
 
 
 #přidat kod pro tvorbu alternativního setu, kdterý bude škálovaný pomocí minmaxscaler, kdyby se chtěl vyzkoušet KNN model
@@ -346,43 +335,19 @@ columns_scaled = dict(enumerate(list(scaler.get_feature_names_out())))
 X_scaled.rename(columns=columns_scaled, inplace=True)
 
 
-X.shape
+#y se nemění X se ale mění, chci se podívat jestli jsou všechny features potřeba
 y = df[df["Survived"].notna()]["Survived"]
-y.shape
-X_guess = df[df["Survived"].isna()]
-X_guess.shape
+
+results = {}
+i=0
+for f in features_to_be_used:
+   X = df[df["Survived"].notna()][features_to_be_used[i]]
+   model_output = test_rfc(X,y)
+   results[i]={'features': f, 'eval': model_output}
+   i = i + 1
 
 
 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-rfc_surv = RandomForestClassifier(random_state=42)
 
-#optimalizace hyperparametrů
-param_grid_surv = {
-    'n_estimators': [100, 300, 500],
-    'max_depth': [5, 7, 10],
-    'min_samples_split': [3, 5, 7],
-    'min_samples_leaf': [2, 4, 6],
-    'max_features': ['sqrt', 3, 5]
-}
-
-# Grid search
-grid_search_surv = GridSearchCV(
-    estimator=rfc_surv,
-    param_grid=param_grid_surv,
-    cv=5,
-    scoring='accuracy',
-    verbose=2,
-    n_jobs=-1  # Use all available cores
-)
-
-grid_search_surv.fit(X_train, y_train)
-
-best_surv_model = grid_search_surv.best_estimator_
-grid_search_surv.best_params_
-y_pred_surv = best_surv_model.predict(X_test)
-
-print(classification_report(y_test, y_pred_surv))
-print(confusion_matrix(y_test, y_pred_surv))

@@ -6,38 +6,46 @@ Created on Fri Jan 17 14:09:36 2025
 """
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.metrics import f1_score, r2_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, r2_score, classification_report, confusion_matrix,ConfusionMatrixDisplay
 import pandas as pd
 
-def predict_cat_feature(feature, predictors):
-    getX = predictors[pd.isna(feature) == False]
-    getY = feature[pd.isna(feature) == False]
+def test_rfc(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     
-    #split the dataset
-    X_train, X_test, y_train, y_test = train_test_split(getX, getY, test_size=0.2, random_state=42, stratify=getY)
+    rfc_surv = RandomForestClassifier(random_state=42)
     
-    #train model - decision tree classifier
-    tree=DecisionTreeClassifier()
-    tree_para = {'criterion':['gini','entropy'],'max_depth':[5,7,9,10,20], 'min_samples_leaf':[2,3,5]}
-    clf = GridSearchCV(tree, tree_para, scoring='f1_samples', cv=5)
-    clf.fit(X_train, y_train)
-    best_tree = clf.best_estimator_
-    return (best_tree, f1_score(y_test, best_tree.predict(X_test)))
+    #optimalizace hyperparametrů
+    param_grid_surv = {
+        'n_estimators': [100, 300, 500, 1000],
+        'max_depth': [5, 7, 10,15],
+        'min_samples_split': [3, 5, 7],
+        'min_samples_leaf': [2, 4, 6],
+        'max_features': ['sqrt', 3, 5]
+    }
     
-
-def predict_cont_feature(feature, predictors):  
-    getX = predictors[feature.isna() == False]
-    getY = [feature.isna() == False]
+    # Grid search
+    grid_search_surv = GridSearchCV(
+        estimator=rfc_surv,
+        param_grid=param_grid_surv,
+        cv=5,
+        scoring='accuracy',
+        verbose=2,
+        n_jobs=-1  # Use all available cores
+    )
     
-    #split the dataset
-    X_train, X_test, y_train, y_test = train_test_split(getX, getY, test_size=0.2, random_state=42, stratify=getY)
+    grid_search_surv.fit(X_train, y_train)
     
-    #train model - decision tree classifier
-    tree=DecisionTreeRegressor()
-    tree_para = {'criterion':['gini','entropy'],'max_depth':[5,7,9,10,20], 'min_samples_leaf':[2,3,5]}
-    clf = GridSearchCV(tree, tree_para, scoring='r2', cv=5)
-    clf.fit(X_train, y_train)
-    best_tree = clf.best_estimator_
-    return (best_tree, r2_score(y_test, best_tree.predict(X_test)))
+    best_surv_model = grid_search_surv.best_estimator_
+    best_params = grid_search_surv.best_params_
+    y_pred_surv = best_surv_model.predict(X_test)
+    cr = classification_report(y_test, y_pred_surv)
+    cm = confusion_matrix(y_test, y_pred_surv)
+    
+    return_dict = {'estimator': best_surv_model,
+                   'paramas': best_params,
+                   'cr': cr,
+                   'cm': cm
+                   }
+    return return_dict
     
