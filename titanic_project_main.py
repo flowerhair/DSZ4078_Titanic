@@ -359,6 +359,17 @@ final_estimator = RandomForestClassifier(
 X_final = df[df["Survived"].notna()][features_to_be_used[3]]
 y_final = y
 
+y_pred_final = final_model.predict(X_final)
+
+cr_final = classification_report(y_final, y_pred_final)
+cm_final = confusion_matrix(y_final, y_pred_final)
+
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_final, display_labels=final_model.classes_)
+disp.plot(cmap=plt.cm.Blues)
+plt.title("Confusion Matrix")
+plt.show()
+
 final_estimator.fit(X_final, y_final)
 X_guess = df[df["Survived"].isna()][features_to_be_used[3]].reset_index(drop=True)
 y_guess = final_estimator.predict(X_guess)
+
